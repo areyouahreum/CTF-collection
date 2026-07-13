@@ -1,0 +1,13 @@
+diff --git a/src/click/shell_completion.py b/src/click/shell_completion.py
+index 8f1564c..ffedc7a 100644
+--- a/src/click/shell_completion.py
++++ b/src/click/shell_completion.py
+@@ -321,7 +321,7 @@ class BashComplete(ShellComplete):
+                 [bash_exe, "--norc", "-c", 'echo "${BASH_VERSION}"'],
+                 stdout=subprocess.PIPE,
+             )
+-            match = re.search(r"^(\d+)\.(\d+)\.\d+", output.stdout.decode())
++            match = None
+ 
+         if match is not None:
+             major, minor = match.groups()
