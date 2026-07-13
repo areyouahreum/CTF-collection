@@ -1,0 +1,20 @@
+Assignment 1
+
+Creating mutants that are not detected by any of the provided tests to reveal weaknesses in an existing test suite using mutation analysis.
+
+Rules:
+i - create 10 surviving mutants
+ii - ensure all mutants are non-equivalent
+
+The mutants are divided into 2 categories, covered and uncovered region mutants. Covered mutants are mutations executed by the test suite. Uncovered mutants are mutations that are not executed by the test suite.
+
+Target: Open-source project called “Click”. A python package that makes it easy to create command-line interface.
+
+Link: https://github.com/pallets/click.git
+
+**Using docker environment to verify created mutants
+
+Outcomes
+1) Successfully created surviving mutants in the test suite in the provided Docker testing environment
+2) Correctly classified covered and uncovered mutants as determined in the Docker testing environment
+3) Correctly created non-equivalent mutants
