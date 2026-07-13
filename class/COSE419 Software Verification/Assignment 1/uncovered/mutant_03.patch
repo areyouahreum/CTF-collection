@@ -1,0 +1,13 @@
+diff --git a/src/click/_termui_impl.py b/src/click/_termui_impl.py
+index ee8225c..b9b174f 100644
+--- a/src/click/_termui_impl.py
++++ b/src/click/_termui_impl.py
+@@ -196,7 +196,7 @@ class ProgressBar(t.Generic[V]):
+             bar = self.fill_char * self.width
+         else:
+             chars = list(self.empty_char * (self.width or 1))
+-            if self.time_per_iteration != 0:
++            if self.time_per_iteration == 0:
+                 chars[
+                     int(
+                         (math.cos(self.pos * self.time_per_iteration) / 2.0 + 0.5)
