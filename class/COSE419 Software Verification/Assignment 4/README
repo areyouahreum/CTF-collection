@@ -1,0 +1,33 @@
+Assignment 4 - SPIN Hands-on
+
+SPIN is a model checking tool used for the formal verification of distributed systems, multi-threaded software, and concurrent protocols.
+It works by translating a system model written in Promela and a system property defined in LTL (Linear Temporal Logic) into Büchi automata,
+exhaustively exploring the state space to mathematically prove correctness or find counterexample trails.
+
+This assignment is a SPIN hands-on consisting of 4 subproblems:
+===========================================================================================================================================
+Problem 1: Traffic Lights (Liveness and Fairness Warm-up)
+- Objective: Understand how SPIN simulates executions and how scheduling fairness impacts temporal properties.
+- Model Overview: 2 independent processes (Light1 and Light2) that continuously and independently toggle their status between RED and GREEN
+- Task: Verify the liveness properties (e.g., live2: []<>(light2 == GREEN)) with and without SPIN weak process fairness flag (-f) to
+observe how scheduling assumptions prevent infinite starvation.
+
+Problem 2: Too-Polite Mutex (Deadlock Analysis)
+- Objective: Analyze a flawed mutual exclusion protocol to see why safety does not guarantee liveness.
+- Model Overview: Two processes (P and Q) that signal their intent to enter their critical section by setting a flag (wantP / wantQ), but
+politely wait for the other process to lower its flag before proceeding.
+- Task: Fill in the missing liveness LTL property. Run verification to prove that while mutual exclusion (safety) holds, the system easily
+falls into a global deadlock where both processes block each other.
+
+Problem 3: Binary Semaphore (Mutual Exclusion and Starvation)
+- Objective: Implement mutual exclusion using a binary semaphore and study strong vs. weak fairness.
+- Model Overview: Two processes coordinate access to a critical section using an atomic semaphore state variable (sem).
+- Task: Fill in the liveness and strong_fair_liveness LTL properties. Run verification to see why SPIN built-in weak fairness (-f) is
+insufficient to prevent starvation, and define strong fairness as an explicit LTL implication/assumption.
+
+Problem 4: Peterson`s Algorithm (Mutual Exclusion with Tie-Breaker)
+- Onjective: Verify a classic, stable two-process mutual exclusion algorithm that guarantees both safety and progress under weak fairness.
+- Model Overview: Uses two request flags and a shared turn variable as a tie-breaker when both processes attempt to enter the critical section
+simultaneously.
+- Task: Fill in the missing liveness LTL property. Verify that the protocol successfully guarantees both safety (mutex) and progress
+(liveness) when weak process fairness is enabled.
