@@ -1,0 +1,352 @@
+diff --git a/tests/test_arguments.py b/tests/test_arguments.py
+index dba8fd1..95924f6 100644
+--- a/tests/test_arguments.py
++++ b/tests/test_arguments.py
+@@ -616,3 +616,8 @@ def test_argument_custom_class_can_override_type_cast_value_and_never_sees_unset
+     result = runner.invoke(cmd, pass_argv)
+     assert not result.exception
+     assert result.exit_code == 0
++
++def test_argument_with_nargs_zero_is_not_required():
++    arg = click.Argument(["args"], nargs=0)
++
++    assert arg.required is False
+diff --git a/tests/test_command_decorators.py b/tests/test_command_decorators.py
+index 5bd268c..39a8778 100644
+--- a/tests/test_command_decorators.py
++++ b/tests/test_command_decorators.py
+@@ -90,3 +90,13 @@ def test_generate_name(name: str) -> None:
+     f.__name__ = name
+     f = click.command(f)
+     assert f.name == "init-data"
++
++def test_group_command_rejects_multiple_positional_callables():
++    import pytest
++    import click
++
++    def f():
++        pass
++
++    with pytest.raises(AssertionError):
++        click.Group().command(f, f)
+diff --git a/tests/test_compat.py b/tests/test_compat.py
+index 0e2e424..daf616d 100644
+--- a/tests/test_compat.py
++++ b/tests/test_compat.py
+@@ -8,3 +8,58 @@ def test_is_jupyter_kernel_output():
+     # implementation detail, aka cheapskate test
+     JupyterKernelFakeStream.__module__ = "ipykernel.faked"
+     assert not should_strip_ansi(stream=JupyterKernelFakeStream())
++
++import sys
++
++from click import _compat
++
++
++def test_get_argv_encoding_falls_back_when_stdin_encoding_is_none(monkeypatch):
++    class Stdin:
++        encoding = None
++
++    monkeypatch.setattr(sys, "stdin", Stdin())
++
++    assert _compat._get_argv_encoding() == sys.getfilesystemencoding()
++
++import io
++
++import click._compat as compat
++
++
++def test_non_closing_text_io_wrapper_delegates_isatty():
++    class TTYBytesIO(io.BytesIO):
++        def isatty(self):
++            return True
++
++    stream = TTYBytesIO()
++    wrapper = compat._NonClosingTextIOWrapper(
++        stream,
++        encoding="utf-8",
++        errors="strict",
++    )
++
++    assert wrapper.isatty() is True
++
++def test_make_text_stream_uses_replace_not_ignore():
++    # invalid utf-8 byte
++    raw = io.BytesIO(b"\xff")
++
++    stream = compat._make_text_stream(raw, encoding="utf-8", errors=None)
++
++    result = stream.read()
++
++    # replacement character must appear
++    assert result == "\ufffd"
++
++
++import click._compat as compat
++
++
++def test_get_best_encoding_returns_non_ascii_encoding():
++    class DummyStream:
++        encoding = "latin-1"
++
++    result = compat.get_best_encoding(DummyStream())
++
++    assert result == "latin-1"
+diff --git a/tests/test_formatting.py b/tests/test_formatting.py
+index c79f657..7367f07 100644
+--- a/tests/test_formatting.py
++++ b/tests/test_formatting.py
+@@ -366,3 +366,50 @@ def test_help_formatter_write_text():
+     actual = formatter.getvalue()
+     expected = "  Lorem ipsum dolor sit amet,\n  consectetur adipiscing elit\n"
+     assert actual == expected
++
++from click.formatting import wrap_text
++def test_wrap_text_default_width_is_78():
++    text = "This is a short sentence that should not wrap with the default width."
++
++    assert wrap_text(text) == text
++
++
++def test_wrap_text_default_does_not_preserve_paragraphs():
++    text = "First paragraph.\n\nSecond paragraph."
++
++    result = wrap_text(text, width=20)
++
++    # Original: paragraphs are merged into a single flow
++    assert "\n\n" not in result
++
++
++from click.formatting import HelpFormatter
++
++def test_help_formatter_wrap_boundary_at_min_width_10():
++    # Carefully chosen width so that:
++    # original -> text_width = 10
++    # mutant   -> text_width = 11
++    formatter = HelpFormatter(width=14)
++
++    # First column short → leaves second column near boundary
++    formatter.write_dl([("a", "abcdefghijk")])  # 11 chars
++
++    output = formatter.getvalue().splitlines()
++
++    # Original (width=10): wraps → second line exists
++    # Mutant   (width=11): fits → stays on one line
++    assert len(output) > 1
++
++
++import shutil
++from click.formatting import HelpFormatter
++
++def test_help_formatter_min_width_is_50(monkeypatch):
++    class Size:
++        columns = 40  # small enough to trigger minimum
++
++    monkeypatch.setattr(shutil, "get_terminal_size", lambda: Size())
++
++    formatter = HelpFormatter()
++
++    assert formatter.width == 50
+diff --git a/tests/test_parser.py b/tests/test_parser.py
+index f2a3ad5..fed33b2 100644
+--- a/tests/test_parser.py
++++ b/tests/test_parser.py
+@@ -30,3 +30,18 @@ def test_parser_collects_prefixes():
+     click.Option("+p", is_flag=True).add_to_parser(parser, ctx)
+     click.Option("!e", is_flag=True).add_to_parser(parser, ctx)
+     assert parser._opt_prefixes == {"-", "--", "+", "!"}
++
++def test_long_option_value_can_contain_equals():
++    import click
++    from click.testing import CliRunner
++
++    @click.command()
++    @click.option("--token")
++    def cli(token):
++        click.echo(token)
++
++    runner = CliRunner()
++    result = runner.invoke(cli, ["--token=a=b=c"])
++
++    assert result.exit_code == 0
++    assert result.output == "a=b=c\n"
+diff --git a/tests/test_shell_completion.py b/tests/test_shell_completion.py
+index 20cff23..1b9fa96 100644
+--- a/tests/test_shell_completion.py
++++ b/tests/test_shell_completion.py
+@@ -559,3 +559,4 @@ def test_files_closed(runner) -> None:
+             assert not current_warnings, "There should be no warnings to start"
+             _get_completions(cli, args=[], incomplete="")
+             assert not current_warnings, "There should be no warnings after either"
++
+diff --git a/tests/test_termui.py b/tests/test_termui.py
+index 8220431..d2a0184 100644
+--- a/tests/test_termui.py
++++ b/tests/test_termui.py
+@@ -710,3 +710,35 @@ def test_flag_value_prompt(
+         assert result.output == expected_output
+         assert not result.stderr
+         assert result.exit_code == 0 if expected not in (REPEAT, INVALID) else 1
++
++import io
++
++import click
++
++def test_progressbar_non_tty_outputs_changed_label():
++    output = io.StringIO()
++
++    with click.progressbar(range(1), label="first", file=output) as bar:
++        bar.render_progress()
++
++        bar.label = "second"
++        bar.render_progress()
++
++    assert output.getvalue() == "first\nsecond\n"
++
++import click._termui_impl as termui
++import shutil
++
++def test_tempfilepager_checks_command_with_which(monkeypatch):
++    calls = []
++
++    def fake_which(cmd):
++        calls.append(cmd)
++        return None
++
++    monkeypatch.setattr(shutil, "which", fake_which)
++
++    result = termui._tempfilepager(["hello"], ["pager"], color=False)
++
++    assert result is False
++    assert calls == ["pager"]
+diff --git a/tests/test_testing.py b/tests/test_testing.py
+index 11fe29d..29c7aa0 100644
+--- a/tests/test_testing.py
++++ b/tests/test_testing.py
+@@ -469,3 +469,18 @@ def test_isolation_flushes_unflushed_stderr():
+ 
+     result = runner.invoke(cli)
+     assert result.stderr == "gyarados gyarados gyarados"
++
++import sys
++
++import click
++
++
++def test_cli_runner_treats_system_exit_none_as_success():
++    @click.command()
++    def cli():
++        sys.exit(None)
++
++    result = click.testing.CliRunner().invoke(cli)
++
++    assert result.exit_code == 0
++    assert result.exception is None
+diff --git a/tests/test_types.py b/tests/test_types.py
+index 75434f1..e2c0db0 100644
+--- a/tests/test_types.py
++++ b/tests/test_types.py
+@@ -255,3 +255,44 @@ def test_choice_get_invalid_choice_message():
+     choice = click.Choice(["a", "b", "c"])
+     message = choice.get_invalid_choice_message("d", ctx=None)
+     assert message == "'d' is not one of 'a', 'b', 'c'."
++
++def test_bool_invalid_value_lists_states_sorted():
++    import pytest
++    import click
++
++    with pytest.raises(click.BadParameter) as e:
++        click.BOOL.convert("maybe", None, None)
++
++    msg = str(e.value)
++
++    # Check that values appear in sorted order
++    assert msg.index("0") < msg.index("1")
++    assert msg.index("1") < msg.index("f")
++    assert msg.index("f") < msg.index("false")
++
++@pytest.mark.parametrize("value", ["accept", "allow", "a"])
++def test_bool_param_type_rejects_extra_truthy_words(value):
++    with pytest.raises(click.BadParameter):
++        click.BOOL.convert(value, None, None)
++
++def test_func_param_type_bad_value_uses_string_fallback():
++    param_type = click.types.FuncParamType(lambda value: (_ for _ in ()).throw(ValueError()))
++
++    with pytest.raises(click.BadParameter) as exc_info:
++        param_type.convert("not-an-int", None, None)
++
++    assert "not-an-int" in str(exc_info.value)
++
++
++def test_int_param_type_repr_is_int():
++    assert repr(click.INT) == "INT"
++
++def test_unprocessed_param_type_repr():
++    assert repr(click.UNPROCESSED) == "UNPROCESSED"
++
++def test_param_type_convert_returns_value_unchanged():
++    param_type = click.ParamType()
++
++    value = object()
++
++    assert param_type.convert(value, None, None) is value
+diff --git a/tests/test_utils.py b/tests/test_utils.py
+index 1b15756..560897a 100644
+--- a/tests/test_utils.py
++++ b/tests/test_utils.py
+@@ -746,3 +746,54 @@ def test_make_default_short_help(value, max_length, alter, expect):
+ 
+     out = click.utils.make_default_short_help(value, max_length)
+     assert out == expect
++
++from click.utils import LazyFile
++
++import click.utils
++
++
++def test_make_str_uses_filesystem_encoding(monkeypatch):
++    value = "€".encode("utf-8")
++
++    monkeypatch.setattr(
++        click.utils.sys,
++        "getfilesystemencoding",
++        lambda: "utf-8",
++    )
++
++    assert click.utils.make_str(value) == "€"
++
++import click.utils
++
++
++def test_lazy_file_dash_opens_standard_stream(monkeypatch):
++    calls = []
++
++    class DummyStream:
++        pass
++
++    dummy_stream = DummyStream()
++
++    def fake_open_stream(filename, mode, encoding=None, errors="strict", atomic=False):
++        calls.append((filename, mode, encoding, errors, atomic))
++        return dummy_stream, False
++
++    monkeypatch.setattr(click.utils, "open_stream", fake_open_stream)
++
++    lazy_file = click.utils.LazyFile("-", "w", encoding="utf-8")
++
++    assert lazy_file._f is dummy_stream
++    assert lazy_file.should_close is False
++    assert calls == [("-", "w", "utf-8", "strict", False)]
++
++from click.utils import _posixify
++
++
++def test_posixify_lowercases_and_replaces_spaces():
++    assert _posixify("Hello World Option") == "hello-world-option"
++
++from click.utils import get_binary_stream
++
++def test_get_binary_stream_unknown_name_raises_type_error():
++    with pytest.raises(TypeError, match="Unknown standard stream 'invalid'"):
++        get_binary_stream("invalid")
